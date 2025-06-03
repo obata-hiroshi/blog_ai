@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Post;
 use Illuminate\Http\Request;
 use App\Http\Requests\PostRequest;
+use Carbon\Carbon;
 
 class PostController extends Controller
 {
@@ -88,5 +89,55 @@ class PostController extends Controller
 
         return redirect()->route('posts.index')
             ->with('success', 'Post deleted successfully.');
+    }
+
+    /**
+     * Display a calendar view of posts.
+     */
+    public function calendar(Request $request)
+    {
+        $year = $request->input('year', Carbon::now()->year);
+        $month = $request->input('month', Carbon::now()->month);
+
+        $date = Carbon::createFromDate($year, $month, 1);
+
+        $startOfMonth = $date->copy()->startOfMonth();
+        $endOfMonth = $date->copy()->endOfMonth();
+
+        $posts = Post::whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                        ->orderBy('created_at')
+                        ->get();
+
+        $postsByDay = [];
+        foreach ($posts as $post) {
+            $day = Carbon::parse($post->created_at)->day;
+            if (!isset($postsByDay[$day])) {
+                $postsByDay[$day] = [];
+            }
+            $postsByDay[$day][] = $post;
+        }
+
+        $daysInMonth = $date->daysInMonth;
+        $startOfWeek = $date->copy()->startOfMonth()->dayOfWeek; // 0 for Sunday, 6 for Saturday
+        $monthNameYear = $date->format('Y年n月');
+
+        $prevMonthLinkData = [
+            'year' => $date->copy()->subMonth()->year,
+            'month' => $date->copy()->subMonth()->month,
+        ];
+        $nextMonthLinkData = [
+            'year' => $date->copy()->addMonth()->year,
+            'month' => $date->copy()->addMonth()->month,
+        ];
+
+        return view('posts.calendar', compact(
+            'date',
+            'postsByDay',
+            'daysInMonth',
+            'startOfWeek',
+            'monthNameYear',
+            'prevMonthLinkData',
+            'nextMonthLinkData'
+        ));
     }
 }

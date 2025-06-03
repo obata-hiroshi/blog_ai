@@ -151,4 +151,58 @@ class PostValidationTest extends TestCase
         $response->assertSessionHasErrors('content');
         $response->assertRedirect();
     }
+
+    /** @test */
+    public function a_post_can_be_soft_deleted()
+    {
+        $post = Post::factory()->create();
+
+        $response = $this->delete(route('posts.destroy', $post));
+
+        $this->assertSoftDeleted($post);
+        $response->assertRedirect(route('posts.index'));
+        $response->assertSessionHas('success', 'Post deleted successfully.');
+    }
+
+    /** @test */
+    public function soft_deleted_post_is_not_visible_on_index_page()
+    {
+        $post = Post::factory()->create();
+        $post->delete(); // Soft delete
+
+        $response = $this->get(route('posts.index'));
+
+        $response->assertOk();
+        $response->assertDontSee($post->title);
+    }
+
+    /** @test */
+    public function soft_deleted_post_can_be_restored()
+    {
+        $post = Post::factory()->create();
+        $post->delete(); // Soft delete
+
+        // Fetch the soft-deleted post and restore it
+        $deletedPost = Post::withTrashed()->find($post->id);
+        $deletedPost->restore();
+
+        $this->assertNotSoftDeleted($post);
+
+        $response = $this->get(route('posts.index'));
+        $response->assertOk();
+        $response->assertSee($post->title);
+    }
+
+    /** @test */
+    public function a_post_can_be_force_deleted()
+    {
+        $post = Post::factory()->create();
+        $post->delete(); // Soft delete
+
+        // Fetch the soft-deleted post and force delete it
+        $deletedPost = Post::withTrashed()->find($post->id);
+        $deletedPost->forceDelete();
+
+        $this->assertDatabaseMissing('posts', ['id' => $post->id]);
+    }
 }

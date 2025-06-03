@@ -9,6 +9,16 @@ use App\Http\Requests\PostRequest;
 class PostController extends Controller
 {
     /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->middleware('auth')->except(['index', 'show']);
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index()
@@ -30,7 +40,7 @@ class PostController extends Controller
      */
     public function store(PostRequest $request)
     {
-        $post = Post::create($request->all());
+        $post = $request->user()->posts()->create($request->validated());
 
         return redirect()->route('posts.show', $post)
             ->with('success', 'Post created successfully.');
@@ -57,7 +67,10 @@ class PostController extends Controller
      */
     public function update(PostRequest $request, Post $post)
     {
-        $post->update($request->all());
+        if ($request->user()->cannot('update', $post)) {
+            abort(403);
+        }
+        $post->update($request->validated());
 
         return redirect()->route('posts.show', $post)
             ->with('success', 'Post updated successfully.');
@@ -68,6 +81,9 @@ class PostController extends Controller
      */
     public function destroy(Post $post)
     {
+        if (auth()->user()->cannot('delete', $post)) {
+            abort(403);
+        }
         $post->delete();
 
         return redirect()->route('posts.index')
